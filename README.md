@@ -1,2 +1,2 @@
 # JuliaEcon
-Computational economics with Julia
+Introduces computational economics with Julia, based on material from Matt Rognlie.
