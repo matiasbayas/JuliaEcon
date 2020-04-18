@@ -27,7 +27,7 @@ function stationary(Π; p_seed = nothing, tol = 1E-11, maxit = 10_000)
 end
 
 function variance(x, p)
-    """ Returns var of discretized random variable with support x and probability mass function p"""
+    """ Returns variance of discretized rv with support x and probability mass function p"""
     return p ⋅ (x .- p ⋅ x) .^ 2
 end
 
@@ -64,7 +64,6 @@ function markov_tauchen(ρ, σ; N=7, m = 3)
     s *= ( σ / sqrt(variance(s, p)))
     y = exp.(s) ./ ( p ⋅ exp.(s))
 
-
     return y, p, Π
 end
 
@@ -78,7 +77,7 @@ function backward_iterate(cplus, k)
     c_endog = up_inv.( β * Π * ( fk(z, k') .* up.(cplus)))
     c = similar(c_endog)
     for (i, zi) in enumerate(z)
-        G = LinearInterpolation(c_endog[i, :] .+ k, c_endog[i, :], extrapolation_bc = Line())
+        G = LinearInterpolation(c_endog[i, :] + k, c_endog[i, :], extrapolation_bc = Line())
         c[i, :] = G.(f(zi, k))
     end
     return c
