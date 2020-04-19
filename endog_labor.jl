@@ -17,12 +17,12 @@ end
 function SteadyState(p::Params, F)
     """ Inputs - parameters and production function F """
     @unpack β, α, δ = p
-    k_n = ((1 / β - 1 + δ) / α )^(1 / (α - 1))
-    D1 = (1-α) * k_n ^ α
-    D2 = F(1, k_n, 1) - k_n
-    cstar = sqrt(D1*D2)
-    nstar = cstar/D2
-    kstar = k_n*nstar
+    k_n = ((1.0 / β - 1.0 + δ) / α )^(1.0 / (α - 1.0))
+    D1 = (1.0-α) * k_n ^ α
+    D2 = F(1.0, k_n, 1.0) - k_n
+    cstar = sqrt(D1 * D2)
+    nstar = cstar / D2
+    kstar = k_n * nstar
     return cstar, nstar, kstar
 end
 
@@ -47,7 +47,7 @@ end
 
 # Assume nq+ and cq+ are chebyshev representations of n+ and c+
 # pr is the vector giving probability of transitioning to each future z, given current z
-function FOC(n, z, k, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p::Params, pr, basis)
+function FOC(n::Float64, z::Float64, k::Float64, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p::Params, pr, basis)
     """ EE to find root with respect to labor choice - n
         Takes as inputs:
         1. guess for today's optimal labor supply - n (scalar - this is what we will find zero over)
@@ -58,17 +58,17 @@ function FOC(n, z, k, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p::Params, pr, ba
         6. parameters for the model - p
         7. transition probabilities - pr
         8. basis in which we are interpolating - basis """
-    up_c = vp(n) ./ Fn(z, k, n)
-    c = up_inv.(up_c)
+    up_c = vp(n) / Fn(z, k, n)
+    c = up_inv(up_c)
     k₊ = F(z, k, n) - c
-    if k₊ < 0
+    if k₊ < 0.
         return -1E-6
     end
     #c₊ = funeval(cq₊, basis, k₊)
     #n₊ = funeval(nq₊, basis, k₊)
     c₊ = BasisMatrix(basis, Direct(), [k₊] ).vals[1]*cq₊  # make sure to pass [k] not just k - does not work with float
     n₊ = BasisMatrix(basis, Direct(), [k₊] ).vals[1]*nq₊
-    inside_E = Fk(z, k₊, n₊) .* up.(c₊)
+    inside_E = Fk(z, k₊, n₊) .* up(c₊)
     return up_c .- p.β * (pr ⋅ inside_E)
 end
 
@@ -91,15 +91,15 @@ function backward_iterate(k, z, nmin, nmax, nq₊, cq₊,up, up_inv, vp, F, Fn, 
     return nq, cq
 end
 
-function ss_policy(k, z, nmin, nmax, c_s, k_s, n_s, up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis; maxit = 100, tol = 5E-9)
-    c = repeat(c_s/k_s*k', length(z), 1)
-    n = repeat(n_s*z, 1, length(k))
+function ss_policy(k, z, nmin, nmax, c_s, k_s, n_s, up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis; maxit = 200, tol = 5E-9)
+    c = repeat(c_s ./ k_s .* k', length(z), 1)
+    n = repeat(n_s .* z, 1, length(k))
     cq = cheb_interp(c', basis)
     nq = cheb_interp(n', basis)
     for it in 1:maxit
         nq_new, cq_new = backward_iterate(k, z, nmin, nmax, nq, cq, up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis)
         if mod(it, 10) ≈ 0 && norm(nq_new - nq) < tol
-            println("Convergence in $it iterations!")
+            #println("Convergence in $it iterations!")
             return nq, cq
         end
         nq = nq_new
@@ -114,23 +114,36 @@ function solveNeoclassical(p::Params, N)
     z, pr, Π = ProductivityProcess(p)
 
     # production and utility functions
-    F(z, k, n) = z .* k.^α .* n.^(1-α) .+ (1 - δ) .* k
-    Fk(z, k, n) =  α .* z .* (n ./ k).^(1 - α) .+ (1 - δ)
-    Fn(z, k, n) = (1 - α) .* z .* (k ./ n).^α
-    up(c) = 1 / c
-    up_inv(c) = 1 / c
+    F(z, k, n) = z .* k.^α .* n.^(1.0 - α) .+ (1.0 - δ) .* k
+    Fk(z, k, n) =  α .* z .* (n ./ k).^(1.0 - α) .+ (1.0 - δ)
+    Fn(z, k, n) = (1.0 - α) .* z .* (k ./ n).^α
+    up(c) = 1.0 ./ c
+    up_inv(c) = 1.0 / c #this doesn't really have to be broadcasted bc it only takes scalars as inputs
     vp(n) = n # frisch elasticity of one
 
     c_s, n_s, k_s = SteadyState(p, F)
     klow, khigh = 0.4 * k_s, 2.5 * k_s
     k, basis = cheb_nodes(klow, khigh, N)
-    nmin, nmax = 0.2 * n_s, 6 * n_s
+    nmin, nmax = 0.2 * n_s, 6.0 * n_s
     nq, cq = ss_policy(k, z, nmin, nmax, c_s, k_s, n_s, up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis)
     return nq, cq, k, basis
 end
 
+@btime ProductivityProcess(Params())
 @btime solveNeoclassical(Params(), 15);
+
+# Profile the code
+#using Profile
+#Profile.clear();
+#Profile.init(delay = 0.05)
+#@profile solveNeoclassical(Params(), 15)
+#Profile.print(format=:flat)
+
 nq, cq, k, basis= solveNeoclassical(Params(), 15);
+
+
+
+
 
 using Plots
 c = funeval(cq, basis, k);
