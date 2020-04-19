@@ -1,8 +1,6 @@
 """ Methods to discretize AR(1) processes - based on Rognlie's material """
 
 
-module markov_approx
-
 using LinearAlgebra, Distributions
 
 function stationary(Π; p_seed = nothing, tol = 1E-11, maxit = 10_000)
@@ -27,12 +25,12 @@ function stationary(Π; p_seed = nothing, tol = 1E-11, maxit = 10_000)
         end
     end
     return p
-end
+end;
 
 function variance(x, p)
     """ Returns variance of discretized rv with support x and probability mass function p"""
     return p ⋅ (x .- p ⋅ x) .^ 2
-end
+end;
 
 function markov_tauchen(ρ, σ; N=7, m = 3)
     """Tauchen method discretizing AR(1) s_t = ρ * s_{t-1} + ϵ_t.
@@ -68,7 +66,4 @@ function markov_tauchen(ρ, σ; N=7, m = 3)
     y = exp.(s) ./ ( p ⋅ exp.(s))
 
     return y, p, Π
-end
-
-
-end
+end;
