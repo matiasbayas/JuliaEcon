@@ -129,8 +129,8 @@ function solveNeoclassical(p::Params, N)
     return nq, cq, k, basis
 end
 
-@btime ProductivityProcess(Params())
-@btime solveNeoclassical(Params(), 15);
+#@btime ProductivityProcess(Params())
+#@btime solveNeoclassical(Params(), 15);
 
 # Profile the code
 #using Profile
@@ -139,14 +139,14 @@ end
 #@profile solveNeoclassical(Params(), 15)
 #Profile.print(format=:flat)
 
-nq, cq, k, basis= solveNeoclassical(Params(), 15);
+#nq, cq, k, basis= solveNeoclassical(Params(), 15);
 
 
 
 
 
-using Plots
-c = funeval(cq, basis, k);
-n = funeval(nq, basis, k);
-plot(k, c, label = ["z_low" "z_mid" "z_high"], lw = 2, legend=:topleft)
-plot(k, n, label = ["z_low" "z_mid" "z_high"], lw = 2, legend=:topleft)
+#using Plots
+#c = funeval(cq, basis, k);
+#n = funeval(nq, basis, k);
+#plot(k, c, label = ["z_low" "z_mid" "z_high"], lw = 2, legend=:topleft)
+#plot(k, n, label = ["z_low" "z_mid" "z_high"], lw = 2, legend=:topleft)
