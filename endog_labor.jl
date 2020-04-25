@@ -47,7 +47,7 @@ end
 
 # Assume nq+ and cq+ are chebyshev representations of n+ and c+
 # pr is the vector giving probability of transitioning to each future z, given current z
-function FOC(n::Float64, z::Float64, k::Float64, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p::Params, pr, basis)
+function FOC(n::Float64, z_cur::Float64, k_cur::Float64, z, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p::Params, pr, basis)
     """ EE to find root with respect to labor choice - n
         Takes as inputs:
         1. guess for today's optimal labor supply - n (scalar - this is what we will find zero over)
@@ -58,9 +58,9 @@ function FOC(n::Float64, z::Float64, k::Float64, nq₊, cq₊, up, up_inv, vp, F
         6. parameters for the model - p
         7. transition probabilities - pr
         8. basis in which we are interpolating - basis """
-    up_c = vp(n) / Fn(z, k, n)
+    up_c = vp(n) / Fn(z_cur, k_cur, n)
     c = up_inv(up_c)
-    k₊ = F(z, k, n) - c
+    k₊ = F(z_cur, k_cur, n) - c
     if k₊ < 0.
         return -1E-6
     end
@@ -68,22 +68,22 @@ function FOC(n::Float64, z::Float64, k::Float64, nq₊, cq₊, up, up_inv, vp, F
     #n₊ = funeval(nq₊, basis, k₊)
     c₊ = BasisMatrix(basis, Direct(), [k₊] ).vals[1]*cq₊  # make sure to pass [k] not just k - does not work with float
     n₊ = BasisMatrix(basis, Direct(), [k₊] ).vals[1]*nq₊
-    inside_E = Fk(z, k₊, n₊) .* up(c₊)
-    return up_c .- p.β * (pr ⋅ inside_E)
-end
+    inside_E = Fk(z', k₊, n₊) .* up(c₊)
+    return up_c .- p.β * (inside_E ⋅ pr)
+    end
 
 function backward_iterate(k, z, nmin, nmax, nq₊, cq₊,up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis)
     nq = similar(nq₊)
     cq = similar(cq₊)
-    for (i, z) in enumerate(z)
+    for (i, z_cur) in enumerate(z)
         #print(i)
-        pr = Π[i, :]
+        pr_z = Π[i, :]
         n = similar(k)
         c = similar(k)
-        for (j, k) in enumerate(k)
-            h(ni) = FOC(ni, z, k, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p::Params, pr, basis)
+        for (j, k_cur) in enumerate(k)
+            h(ni) = FOC(ni, z_cur, k_cur, z, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p::Params, pr_z, basis)
             n[j] = brent(h, nmin, nmax) #this does a lot better than the f_zero from roots
-            c[j] = up_inv(vp(n[j]) / Fn(z, k, n[j]))
+            c[j] = up_inv(vp(n[j]) / Fn(z_cur, k_cur, n[j]))
         end
         nq[:, i] = cheb_interp(n, basis)
         cq[:, i] = cheb_interp(c, basis)
@@ -130,7 +130,8 @@ function solveNeoclassical(p::Params, N)
 end
 
 #@btime ProductivityProcess(Params())
-#@btime solveNeoclassical(Params(), 15);
+#@benchmark solveNeoclassical(Params(), 15);
+
 
 # Profile the code
 #using Profile
