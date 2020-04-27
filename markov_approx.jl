@@ -67,3 +67,42 @@ function markov_tauchen(ρ, σ; N=7, m = 3)
 
     return y, p, Π
 end;
+
+function rouwenhorst(ρ, σ; N=7)
+    """ Rouwenhorst method to discretize AR(1) process
+
+    Parameters
+    -----------
+    ρ  :  float, persistence
+    σ  :  float, standard deviation of innovations
+    N  :  int, numer of states in discretized process
+
+    Returns
+    ---------
+    s  : array(n), values at N discretized states
+    pr : array(n), stationary distribution across N states
+    Π  : array(n*n), transition matrix
+    """
+
+    # parametrize Rouwenhorst markov matrix for n=2
+    p = (1. + ρ) / 2
+    Π = [p 1-p; 1-p p]
+
+    # implement recursion to build from n=3 to n=N
+    for n in 3:N
+        Π_old = Π
+        Π = zeros(n, n)
+        Π[1:end-1, 1:end-1] += p * Π_old
+        Π[1:end-1, 2:end] += (1-p) * Π_old
+        Π[2:end, 1:end-1] += (1-p) * Π_old
+        Π[2:end, 2:end] += p * Π_old
+        Π[2:end-1, :] /= 2   #why do you do this??
+    end
+
+    pr = stationary(Π)
+    s = collect(range(-1., 1., length = N))
+    s *= σ / sqrt(variance(s, pr))
+    y = exp.(s) ./ ( pr ⋅ exp.(s))
+
+    return y, pr, Π
+end
