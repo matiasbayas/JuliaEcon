@@ -88,7 +88,7 @@ function ergodic_dist(Π, k₊i, pi_k; maxit = 10000, tol = 1E-10)
     for it in 1:maxit
         Dnew = forward_iterate(D, Π, k₊i, pi_k)
         if mod(it, 20) ≈ 0 && norm(Dnew - D) < tol
-            println("Convergence after $it iterations!")
+            #println("Convergence after $it iterations!")
             break
         end
         D = Dnew
