@@ -15,7 +15,7 @@ function geomspace(amin::Float64, amax::Float64, N::Int64; pivot = 0.1)
 end
 
 function IncomeProcess(p::Params)
-    y, p, Π = rouwenhorst(p.ρ, p.σ, N=7)
+    y, p, Π = markov_rouwenhorst(p.ρ, p.σ, N=7)
 end
 
 function backward_iterate(c₊, a, y, r, r_post, Π, up, up_inv, p::Params)
@@ -43,7 +43,7 @@ function ss_policy(a, y, r, Π, up, up_inv, p::Params; maxit = 10000, tol = 1E-9
 
     for it in 1:maxit
         c_new, a_new = backward_iterate(c, a, y, r, r, Π, up, up_inv, p)
-        if mod(it, 10) ≈ 0 && norm(c_new - c) < tol
+        if mod(it, 10) == 0 && norm(c_new - c) < tol
             #println("Convergence in $it iterations!")
             return c_new, a_new
         end
@@ -81,4 +81,4 @@ end
 #a, c, a₊, D, C, A = solveIncompleteMarkets(0., 200., 500, Params());
 
 #using BenchmarkTools
-#@btime solveIncompleteMarkets_ss(0., 200., 500, Params())
+#@btime solveIncompleteMarkets(0., 200., 500, Params())
