@@ -68,7 +68,7 @@ function markov_tauchen(ρ, σ; N=7, m = 3)
     return y, p, Π
 end;
 
-function rouwenhorst(ρ, σ; N=7)
+function markov_rouwenhorst(ρ, σ; N=7)
     """ Rouwenhorst method to discretize AR(1) process
 
     Parameters
