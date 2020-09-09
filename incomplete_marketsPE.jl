@@ -82,3 +82,29 @@ end
 
 #using BenchmarkTools
 #@btime solveIncompleteMarkets(0., 200., 500, Params())
+function ssPE(amin::Float64, amax::Float64, N::Int64, p::Params)
+
+    r = 0.01/4
+    @assert p.β * (1 + r) ≤ 1 # need this for problem to be well defined
+    y, pr, Π = IncomeProcess(p)
+    up(c) = 1 ./ c
+    up_inv(c) = 1 ./ c
+    a = geomspace(amin, amax, N)
+
+    # solve for policy
+    c, a₊ = ss_policy(a, y, r, Π, up, up_inv, p)
+
+    # solve for distribution
+    a₊i = Array{Int64}(undef, length(a), length(y))
+    pi_a = Array{Float64}(undef, length(a), length(y))
+    for i in 1:length(y)
+        a₊i[:, i], pi_a[:, i] = interpolate_policy(a, a₊[:, i])
+    end
+    D = ergodic_dist(Π, a₊i, pi_a; maxit = 10000, tol = 1E-10);
+
+    #get aggregates
+    C = c ⋅ D
+    A = a ⋅ sum(D, dims = 2)
+
+    return a, c, a₊, D, C, A
+end

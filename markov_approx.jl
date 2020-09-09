@@ -1,6 +1,4 @@
-""" Methods to discretize AR(1) processes - based on Rognlie's material """
-
-
+# Methods to discretize AR(1) processes - based on Rognlie's material
 using LinearAlgebra, Distributions
 
 function stationary(Π; p_seed = nothing, tol = 1E-11, maxit = 10_000)

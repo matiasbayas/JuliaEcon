@@ -4,7 +4,7 @@ function interpolate_policy(x, xq)
 
     Parameters
     ----------
-    x  : array(n), ascending data points
+    x   : array(n), ascending data points
     xq  : array(nq), ascending query points
 
     Returns
@@ -65,8 +65,7 @@ function forward_iterate(D, Π, k₊i, pi_k)
     return Dnew * Π
 end
 
-function ergodic_dist(Π, k₊i, pi_k; maxit = 10000, tol = 1E-10)
-
+function ergodic_dist(Π, k₊i, pi_k; maxit = 10000, tol = 1E-10, verbose = true)
     """ Computes the ergodic distribution of model with discretized policy rule  k₊i and weights pi_k, given transition matrix for exogenous states Π.
 
     Parameters
@@ -88,7 +87,9 @@ function ergodic_dist(Π, k₊i, pi_k; maxit = 10000, tol = 1E-10)
     for it in 1:maxit
         Dnew = forward_iterate(D, Π, k₊i, pi_k)
         if mod(it, 20) ≈ 0 && norm(Dnew - D) < tol
-            #println("Convergence after $it iterations!")
+            if verbose
+                println("Convergence after $it iterations!")
+            end
             break
         end
         D = Dnew
