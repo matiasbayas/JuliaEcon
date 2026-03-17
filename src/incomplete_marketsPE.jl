@@ -1,3 +1,5 @@
+# Partial equilibrium incomplete markets model (Bewley-Huggett-Aiyagari) solved via EGM
+
 include("markov_approx.jl")
 include("distribution.jl")
 using Parameters, LinearAlgebra, Interpolations
@@ -15,11 +17,17 @@ function geomspace(amin::Float64, amax::Float64, N::Int64; pivot = 0.1)
 end
 
 function IncomeProcess(p::Params)
-    y, p, Π = markov_rouwenhorst(p.ρ, p.σ, N=7)
+    y, _, Π = markov_rouwenhorst(p.ρ, p.σ, N=7)
+    return y, Π
 end
 
-function backward_iterate(c₊, a, y, r, r_post, Π, up, up_inv, p::Params)
+"""
+    backward_iterate(c₊, a, y, r, r_post, Π, up, up_inv, p)
 
+One step of backward iteration on the consumption policy function via EGM
+and linear interpolation.
+"""
+function backward_iterate(c₊, a, y, r, r_post, Π, up, up_inv, p::Params)
     coh = (1+r_post)*a .+ y'
     c_endog = up_inv( p.β * (1+r) * up(c₊) * Π')
     c = similar(c_endog)
@@ -28,7 +36,7 @@ function backward_iterate(c₊, a, y, r, r_post, Π, up, up_inv, p::Params)
         c[:, s] = G.(coh[:,s])
     end
 
-    # deals with the constraint - could be improved
+    # deals with the constraint
     a₊ = coh - c
     a₊[a₊ .< a[1]] .= a[1]
     c = coh - a₊
@@ -36,26 +44,30 @@ function backward_iterate(c₊, a, y, r, r_post, Π, up, up_inv, p::Params)
     return c, a₊
 end
 
+"""Solve for steady state consumption and asset policy functions via backward iteration."""
 function ss_policy(a, y, r, Π, up, up_inv, p::Params; maxit = 10000, tol = 1E-9)
-
     # initial guess for policy function
     c = 0.2 * ((1+r)*a .+ y')
 
     for it in 1:maxit
         c_new, a_new = backward_iterate(c, a, y, r, r, Π, up, up_inv, p)
         if mod(it, 10) == 0 && norm(c_new - c) < tol
-            #println("Convergence in $it iterations!")
             return c_new, a_new
         end
         c = c_new
     end
 end
 
+"""
+    solveIncompleteMarkets(amin, amax, N, p)
+
+Solve the partial equilibrium incomplete markets model: policy functions,
+ergodic distribution, and aggregate consumption/assets.
+"""
 function solveIncompleteMarkets(amin::Float64, amax::Float64, N::Int64, p::Params)
-
     r = 0.01/4
-    @assert p.β * (1 + r) ≤ 1 # need this for problem to be well defined
-    y, pr, Π = IncomeProcess(p)
+    @assert p.β * (1 + r) ≤ 1 "β(1+r) > 1: problem is not well-defined"
+    y, Π = IncomeProcess(p)
     up(c) = 1 ./ c
     up_inv(c) = 1 ./ c
     a = geomspace(amin, amax, N)
@@ -71,38 +83,7 @@ function solveIncompleteMarkets(amin::Float64, amax::Float64, N::Int64, p::Param
     end
     D = ergodic_dist(Π, a₊i, pi_a; maxit = 10000, tol = 1E-10);
 
-    #get aggregates
-    C = c ⋅ D
-    A = a ⋅ sum(D, dims = 2)
-
-    return a, c, a₊, D, C, A
-end
-
-#a, c, a₊, D, C, A = solveIncompleteMarkets(0., 200., 500, Params());
-
-#using BenchmarkTools
-#@btime solveIncompleteMarkets(0., 200., 500, Params())
-function ssPE(amin::Float64, amax::Float64, N::Int64, p::Params)
-
-    r = 0.01/4
-    @assert p.β * (1 + r) ≤ 1 # need this for problem to be well defined
-    y, pr, Π = IncomeProcess(p)
-    up(c) = 1 ./ c
-    up_inv(c) = 1 ./ c
-    a = geomspace(amin, amax, N)
-
-    # solve for policy
-    c, a₊ = ss_policy(a, y, r, Π, up, up_inv, p)
-
-    # solve for distribution
-    a₊i = Array{Int64}(undef, length(a), length(y))
-    pi_a = Array{Float64}(undef, length(a), length(y))
-    for i in 1:length(y)
-        a₊i[:, i], pi_a[:, i] = interpolate_policy(a, a₊[:, i])
-    end
-    D = ergodic_dist(Π, a₊i, pi_a; maxit = 10000, tol = 1E-10);
-
-    #get aggregates
+    # get aggregates
     C = c ⋅ D
     A = a ⋅ sum(D, dims = 2)
 

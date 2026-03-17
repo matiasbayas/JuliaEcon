@@ -1,10 +1,10 @@
-""" Solve neoclassical model with endogenous labor via Chebyshev polynomials """
+# Neoclassical growth model with endogenous labor via Chebyshev polynomials
 
 include("markov_approx.jl")
 
-using Parameters, BasisMatrices, BenchmarkTools, QuantEcon
+using Parameters, BasisMatrices, QuantEcon
 
-# Define class with std parameters for the model
+"""Parameters for the neoclassical model with endogenous labor."""
 @with_kw struct Params
     β::Float64 = 0.95
     α::Float64 = 0.4
@@ -13,9 +13,8 @@ using Parameters, BasisMatrices, BenchmarkTools, QuantEcon
     σ::Float64 = 0.2
 end
 
-# Function to compute steady state of capital, labor, and consumption
+"""Compute steady state capital, labor, and consumption given parameters and production function F."""
 function SteadyState(p::Params, F)
-    """ Inputs - parameters and production function F """
     @unpack β, α, δ = p
     k_n = ((1.0 / β - 1.0 + δ) / α )^(1.0 / (α - 1.0))
     D1 = (1.0-α) * k_n ^ α
@@ -26,63 +25,52 @@ function SteadyState(p::Params, F)
     return cstar, nstar, kstar
 end
 
-# Function to discretize AR(1) process using Rognlie's routines
 function ProductivityProcess(p::Params)
     @unpack ρ, σ  = p
     z, p, Π = markov_tauchen(ρ, σ, N=3, m=2)
 end
 
-# automate chebyshev stuff - can still be improved
+"""Get N Chebyshev nodes for grid [xlow, xhigh]."""
 function cheb_nodes(xlow, xhigh, N)
-    """ Get N chebyshev nodes for grid [xlow, xhigh] """
     basis = Basis(ChebParams(N, xlow, xhigh))
     return nodes(basis)[1], basis
 end
 
+"""Chebyshev interpolation: given basis and data y, find polynomial coefficients."""
 function cheb_interp(y, basis)
-    """ Efficient interpolation - input the basis from cheb_nodes and query points - y  """
-    Φ = BasisMatrix(basis, Tensor()) # Direct() does better than Expanded() - try Tensor()
+    Φ = BasisMatrix(basis, Tensor())
     return Φ.vals[1] \ y
 end
 
-# Assume nq+ and cq+ are chebyshev representations of n+ and c+
-# pr is the vector giving probability of transitioning to each future z, given current z
+"""
+    FOC(n, z_cur, k_cur, z, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p, pr, basis)
+
+Euler equation residual for the labor choice. Used as the objective for
+root-finding (Brent's method) at each grid point.
+"""
 function FOC(n::Float64, z_cur::Float64, k_cur::Float64, z, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p::Params, pr, basis)
-    """ EE to find root with respect to labor choice - n
-        Takes as inputs:
-        1. guess for today's optimal labor supply - n (scalar - this is what we will find zero over)
-        2. capital stock today - k (scalar)
-        3. level of productivity - z (scalar)
-        4. tomorrow's policy functions in chebyshev form - nq+, cq+
-        5. prod fun utility fun and their derivatives/inverses - up, up_inv, F,  F_n, F_k
-        6. parameters for the model - p
-        7. transition probabilities - pr
-        8. basis in which we are interpolating - basis """
     up_c = vp(n) / Fn(z_cur, k_cur, n)
     c = up_inv(up_c)
     k₊ = F(z_cur, k_cur, n) - c
     if k₊ < 0.
         return -1E-6
     end
-    #c₊ = funeval(cq₊, basis, k₊)
-    #n₊ = funeval(nq₊, basis, k₊)
-    c₊ = BasisMatrix(basis, Direct(), [k₊] ).vals[1]*cq₊  # make sure to pass [k] not just k - does not work with float
+    c₊ = BasisMatrix(basis, Direct(), [k₊] ).vals[1]*cq₊
     n₊ = BasisMatrix(basis, Direct(), [k₊] ).vals[1]*nq₊
     inside_E = Fk(z', k₊, n₊) .* up(c₊)
     return up_c .- p.β * (inside_E ⋅ pr)
-    end
+end
 
-function backward_iterate(k, z, nmin, nmax, nq₊, cq₊,up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis)
+function backward_iterate(k, z, nmin, nmax, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis)
     nq = similar(nq₊)
     cq = similar(cq₊)
     for (i, z_cur) in enumerate(z)
-        #print(i)
         pr_z = Π[i, :]
         n = similar(k)
         c = similar(k)
         for (j, k_cur) in enumerate(k)
             h(ni) = FOC(ni, z_cur, k_cur, z, nq₊, cq₊, up, up_inv, vp, F, Fn, Fk, p::Params, pr_z, basis)
-            n[j] = brent(h, nmin, nmax) #this does a lot better than the f_zero from roots
+            n[j] = brent(h, nmin, nmax)
             c[j] = up_inv(vp(n[j]) / Fn(z_cur, k_cur, n[j]))
         end
         nq[:, i] = cheb_interp(n, basis)
@@ -99,7 +87,6 @@ function ss_policy(k, z, nmin, nmax, c_s, k_s, n_s, up, up_inv, vp, F, Fn, Fk, p
     for it in 1:maxit
         nq_new, cq_new = backward_iterate(k, z, nmin, nmax, nq, cq, up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis)
         if mod(it, 10) ≈ 0 && norm(nq_new - nq) < tol
-            #println("Convergence in $it iterations!")
             return nq, cq
         end
         nq = nq_new
@@ -107,6 +94,12 @@ function ss_policy(k, z, nmin, nmax, c_s, k_s, n_s, up, up_inv, vp, F, Fn, Fk, p
     end
 end
 
+"""
+    solveNeoclassical(p, N)
+
+Solve the neoclassical model with endogenous labor supply using N Chebyshev nodes.
+Returns Chebyshev coefficients for labor and consumption policies.
+"""
 function solveNeoclassical(p::Params, N)
     @unpack β, α, δ = p
 
@@ -118,8 +111,8 @@ function solveNeoclassical(p::Params, N)
     Fk(z, k, n) =  α .* z .* (n ./ k).^(1.0 - α) .+ (1.0 - δ)
     Fn(z, k, n) = (1.0 - α) .* z .* (k ./ n).^α
     up(c) = 1.0 ./ c
-    up_inv(c) = 1.0 / c #this doesn't really have to be broadcasted bc it only takes scalars as inputs
-    vp(n) = n # frisch elasticity of one
+    up_inv(c) = 1.0 ./ c
+    vp(n) = n # Frisch elasticity of one
 
     c_s, n_s, k_s = SteadyState(p, F)
     klow, khigh = 0.4 * k_s, 2.5 * k_s
@@ -128,26 +121,3 @@ function solveNeoclassical(p::Params, N)
     nq, cq = ss_policy(k, z, nmin, nmax, c_s, k_s, n_s, up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis)
     return nq, cq, k, basis
 end
-
-#@btime ProductivityProcess(Params())
-#@benchmark solveNeoclassical(Params(), 15);
-
-
-# Profile the code
-#using Profile
-#Profile.clear();
-#Profile.init(delay = 0.05)
-#@profile solveNeoclassical(Params(), 15)
-#Profile.print(format=:flat)
-
-#nq, cq, k, basis= solveNeoclassical(Params(), 15);
-
-
-
-
-
-#using Plots
-#c = funeval(cq, basis, k);
-#n = funeval(nq, basis, k);
-#plot(k, c, label = ["z_low" "z_mid" "z_high"], lw = 2, legend=:topleft)
-#plot(k, n, label = ["z_low" "z_mid" "z_high"], lw = 2, legend=:topleft)

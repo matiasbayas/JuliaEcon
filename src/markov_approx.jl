@@ -1,10 +1,9 @@
-# Methods to discretize AR(1) processes - based on Rognlie's material
+# Tauchen and Rouwenhorst methods to discretize AR(1) processes
+
 using LinearAlgebra, Distributions
 
+"""Find invariant distribution of Markov chain by iteration."""
 function stationary(Π; p_seed = nothing, tol = 1E-11, maxit = 10_000)
-
-    """ Find invariant distribution of Markov chain by iteration """
-
     if isnothing(p_seed)
         p = ones(1, size(Π)[1]) / size(Π)[1]
     else
@@ -23,28 +22,22 @@ function stationary(Π; p_seed = nothing, tol = 1E-11, maxit = 10_000)
         end
     end
     return p
-end;
+end
 
+"""Returns variance of discretized random variable with support x and probability mass function p."""
 function variance(x, p)
-    """ Returns variance of discretized rv with support x and probability mass function p"""
     return p ⋅ (x .- p ⋅ x) .^ 2
-end;
+end
 
+"""
+    markov_tauchen(ρ, σ; N=7, m=3)
+
+Tauchen method discretizing AR(1) s_t = ρ * s_{t-1} + ϵ_t.
+
+Returns `(y, p, Π)`: states proportional to exp(s) with E[y]=1,
+stationary distribution, and transition matrix.
+"""
 function markov_tauchen(ρ, σ; N=7, m = 3)
-    """Tauchen method discretizing AR(1) s_t = ρ * s_{t-1} + ϵ_t.
-    Parameters
-    ----------
-    ρ   : scalar, persistence
-    σ   : scalar, unconditional sd of s_t
-    N   : int, number of states in discretized Markov process
-    m   : scalar, discretized s goes from approx -m*sigma to m*sigma
-
-    Returns
-    ----------
-    y  : array (N), states proportional to exp(s) s.t. E[y] = 1
-    p : array (N), stationary distribution of discretized process
-    Π : array (N*N), Markov matrix for discretized process
-    """
     # make normalized grid, start with cross-sectional sd of 1
     s = range(-m, m, length = N)
     ds = s[2] - s[1]
@@ -64,24 +57,16 @@ function markov_tauchen(ρ, σ; N=7, m = 3)
     y = exp.(s) ./ ( p ⋅ exp.(s))
 
     return y, p, Π
-end;
+end
 
+"""
+    markov_rouwenhorst(ρ, σ; N=7)
+
+Rouwenhorst method to discretize AR(1) process.
+
+Returns `(y, pr, Π)`: states, stationary distribution, and transition matrix.
+"""
 function markov_rouwenhorst(ρ, σ; N=7)
-    """ Rouwenhorst method to discretize AR(1) process
-
-    Parameters
-    -----------
-    ρ  :  float, persistence
-    σ  :  float, standard deviation of innovations
-    N  :  int, numer of states in discretized process
-
-    Returns
-    ---------
-    s  : array(n), values at N discretized states
-    pr : array(n), stationary distribution across N states
-    Π  : array(n*n), transition matrix
-    """
-
     # parametrize Rouwenhorst markov matrix for n=2
     p = (1. + ρ) / 2
     Π = [p 1-p; 1-p p]
@@ -94,7 +79,7 @@ function markov_rouwenhorst(ρ, σ; N=7)
         Π[1:end-1, 2:end] += (1-p) * Π_old
         Π[2:end, 1:end-1] += (1-p) * Π_old
         Π[2:end, 2:end] += p * Π_old
-        Π[2:end-1, :] /= 2   #why do you do this??
+        Π[2:end-1, :] /= 2
     end
 
     pr = stationary(Π)

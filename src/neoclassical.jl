@@ -1,11 +1,9 @@
-# Neoclassical Growth Model with Discretized State Space and Backward Iteration
+# Neoclassical growth model with discretized state space and backward iteration (EGM)
 
-using LinearAlgebra, Distributions, Interpolations, BenchmarkTools, Plots
+using LinearAlgebra, Distributions, Interpolations
 
+"""Find invariant distribution of Markov chain by iteration."""
 function stationary(Π; p_seed = nothing, tol = 1E-11, maxit = 10_000)
-
-    """ Find invariant distribution of Markov chain by iteration """
-
     if isnothing(p_seed)
         p = ones(1, size(Π)[1]) / size(Π)[1]
     else
@@ -26,32 +24,22 @@ function stationary(Π; p_seed = nothing, tol = 1E-11, maxit = 10_000)
     return p
 end
 
+"""Returns variance of discretized random variable with support x and pmf p."""
 function variance(x, p)
-    """ Returns variance of discretized rv with support x and probability mass function p"""
     return p ⋅ (x .- p ⋅ x) .^ 2
 end
 
-function markov_tauchen(ρ, σ; N=7, m = 3)
-    """Tauchen method discretizing AR(1) s_t = ρ * s_{t-1} + ϵ_t.
-    Parameters
-    ----------
-    ρ   : scalar, persistence
-    σ   : scalar, unconditional sd of s_t
-    N   : int, number of states in discretized Markov process
-    m   : scalar, discretized s goes from approx -m*sigma to m*sigma
+"""
+    markov_tauchen(ρ, σ; N=7, m=3)
 
-    Returns
-    ----------
-    y  : array (N), states proportional to exp(s) s.t. E[y] = 1
-    p : array (N), stationary distribution of discretized process
-    Π : array (N*N), Markov matrix for discretized process
-    """
-    # make normalized grid, start with cross-sectional sd of 1
+Tauchen method discretizing AR(1) s_t = ρ * s_{t-1} + ϵ_t.
+Returns `(y, p, Π)`: states, stationary distribution, and transition matrix.
+"""
+function markov_tauchen(ρ, σ; N=7, m = 3)
     s = range(-m, m, length = N)
     ds = s[2] - s[1]
     sd_innov = sqrt(1 - ρ ^ 2)
 
-    # standard Tauchen method to generate Π given N and m
     Π = Array{Float64}(undef, N, N)
     Π[:, 1] = cdf.(Normal(0.0, sd_innov), s[1] .- ρ * s .+ ds / 2)
     Π[:, end] = 1 .- cdf.(Normal(0.0, sd_innov), s[end] .- ρ * s .- ds / 2)
@@ -59,7 +47,6 @@ function markov_tauchen(ρ, σ; N=7, m = 3)
         Π[:, j] = cdf.(Normal(0.0, sd_innov), s[j] .- ρ * s .+ ds / 2) - cdf.(Normal(0.0, sd_innov), s[j] .- ρ * s .- ds / 2)
     end
 
-    # invariant distribution and scaling
     p = stationary(Π)
     s *= ( σ / sqrt(variance(s, p)))
     y = exp.(s) ./ ( p ⋅ exp.(s))
@@ -67,9 +54,8 @@ function markov_tauchen(ρ, σ; N=7, m = 3)
     return y, p, Π
 end
 
-
 f(z, k) = z .* k .^ α .+ (1 - δ) .* k
-fk(z, k) =  α .* z .* k .^ (α - 1) .+ (1 - δ) ;
+fk(z, k) =  α .* z .* k .^ (α - 1) .+ (1 - δ)
 up(c) = 1 / c
 up_inv(c) = 1 / c
 
@@ -99,16 +85,8 @@ function ss_policy(k; maxit = 10_000, tol = 1E-10)
     for it in 1:maxit
         cnew = backward_iterate(c, k)
         if mod(it, 10) ≈ 0 && norm(cnew - c) < tol
-            #println("Convergence in $it iterations!")
             return cnew
-            break
         end
         c = cnew
     end
 end
-
-c = ss_policy(k)
-
-plot(k, c')
-
-size(k)
