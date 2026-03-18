@@ -10,12 +10,13 @@ function interpolate_policy(x, xq)
     nq, n = size(xq)[1], size(x)[1]
     xqi = Array{Int64}(undef, nq)
     pi = Array{Float64}(undef, nq)
+    xq_clamped = clamp.(xq, x[1], x[end])
 
     xi = 1
     xlow = x[1]
     xhigh = x[2]
     for i in 1:nq
-        xq_cur = xq[i]
+        xq_cur = xq_clamped[i]
         while xi < n - 1
             if xhigh >= xq_cur
                 break
@@ -25,7 +26,7 @@ function interpolate_policy(x, xq)
             xhigh = x[xi + 1]
         end
         xqi[i] = xi
-        pi[i] = (xhigh - xq_cur) / (xhigh - xlow)
+        pi[i] = clamp((xhigh - xq_cur) / (xhigh - xlow), 0.0, 1.0)
     end
     return xqi, pi
 end
@@ -68,6 +69,7 @@ function ergodic_dist(Π, k₊i, pi_k; maxit = 10000, tol = 1E-10, verbose = tru
             if verbose
                 println("Convergence after $it iterations!")
             end
+            D = Dnew
             break
         end
         D = Dnew

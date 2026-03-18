@@ -9,7 +9,15 @@ end
 
 """Evaluate Chebyshev approximation in basis represented by q at points x."""
 function cheb_eval(x, q, basis)
-    return BasisMatrix(basis, Direct(), [x]).vals[1]*q
+    xpts = x isa AbstractArray ? x : [x]
+    vals = BasisMatrix(basis, Direct(), xpts).vals[1] * q
+    if x isa AbstractArray
+        return vals
+    elseif q isa AbstractVector
+        return only(vals)
+    else
+        return vec(vals)
+    end
 end
 
 """Get the matrix for Chebyshev polynomial interpolation."""

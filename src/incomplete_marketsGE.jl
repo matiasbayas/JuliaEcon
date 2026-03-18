@@ -88,16 +88,22 @@ Compute partial equilibrium transition dynamics for the incomplete markets model
 Backward iterates on policy, then forward iterates on the distribution.
 """
 function td_PE(a, y, r, Π, up, up_inv, p::Params; rs = nothing, ys = nothing)
-    if ! isnothing(rs)
+    if isnothing(rs) && isnothing(ys)
+        throw(ArgumentError("td_PE requires at least one of `rs` or `ys`."))
+    end
+    if !isnothing(rs)
         T = length(rs)
-    elseif ! isnothing(ys)
+    else
         T = size(ys)[1]
+    end
+    if !isnothing(ys) && size(ys, 1) != T
+        throw(DimensionMismatch("`ys` must have the same number of periods as `rs`."))
     end
     if isnothing(rs)
         rs = fill(r, T)
     end
     if isnothing(ys)
-        ys = fill(y, T)
+        ys = repeat(y', T, 1)
     end
 
     # computes initial and final steady state

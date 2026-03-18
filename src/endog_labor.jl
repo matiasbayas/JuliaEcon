@@ -56,7 +56,7 @@ function FOC(n::Float64, z_cur::Float64, k_cur::Float64, z, nq₊, cq₊, up, up
         return -1E-6
     end
     c₊ = BasisMatrix(basis, Direct(), [k₊] ).vals[1]*cq₊
-    n₊ = BasisMatrix(basis, Direct(), [k₊] ).vals[1]*nq₊
+    n₊ = max.(BasisMatrix(basis, Direct(), [k₊] ).vals[1]*nq₊, eps(Float64))
     inside_E = Fk(z', k₊, n₊) .* up(c₊)
     return up_c .- p.β * (inside_E ⋅ pr)
 end
@@ -87,11 +87,12 @@ function ss_policy(k, z, nmin, nmax, c_s, k_s, n_s, up, up_inv, vp, F, Fn, Fk, p
     for it in 1:maxit
         nq_new, cq_new = backward_iterate(k, z, nmin, nmax, nq, cq, up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis)
         if mod(it, 10) ≈ 0 && norm(nq_new - nq) < tol
-            return nq, cq
+            return nq_new, cq_new
         end
         nq = nq_new
         cq = cq_new
     end
+    return nq, cq
 end
 
 """
@@ -117,7 +118,7 @@ function solveNeoclassical(p::Params, N)
     c_s, n_s, k_s = SteadyState(p, F)
     klow, khigh = 0.4 * k_s, 2.5 * k_s
     k, basis = cheb_nodes(klow, khigh, N)
-    nmin, nmax = 0.2 * n_s, 6.0 * n_s
+    nmin, nmax = max(0.2 * n_s, eps(Float64)), 6.0 * n_s
     nq, cq = ss_policy(k, z, nmin, nmax, c_s, k_s, n_s, up, up_inv, vp, F, Fn, Fk, p::Params, Π, basis)
     return nq, cq, k, basis
 end
