@@ -194,12 +194,18 @@ end
 function productivity_process(cfg::GrowthReferenceConfig)
     if cfg.preset == "legacy"
         return ProductivityProcess(to_endog_params(cfg))
-    elseif cfg.shock_method == "rouwenhorst"
-        return markov_rouwenhorst(cfg.rho, cfg.sigma_eps; N = cfg.z_nodes)
-    elseif cfg.shock_method == "tauchen"
-        return markov_tauchen(cfg.rho, cfg.sigma_eps; N = cfg.z_nodes, m = cfg.tauchen_m)
     else
-        error("Unsupported shock method: $(cfg.shock_method)")
+        # ARDE benchmark prompts specify sigma_e as the innovation standard
+        # deviation in the AR(1), while the JuliaEcon discretizers take the
+        # stationary standard deviation of log productivity.
+        stationary_sigma = cfg.sigma_eps / sqrt(1.0 - cfg.rho ^ 2)
+        if cfg.shock_method == "rouwenhorst"
+            return markov_rouwenhorst(cfg.rho, stationary_sigma; N = cfg.z_nodes)
+        elseif cfg.shock_method == "tauchen"
+            return markov_tauchen(cfg.rho, stationary_sigma; N = cfg.z_nodes, m = cfg.tauchen_m)
+        else
+            error("Unsupported shock method: $(cfg.shock_method)")
+        end
     end
 end
 
