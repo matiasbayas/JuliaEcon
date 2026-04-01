@@ -230,8 +230,35 @@ function monotone_non_decreasing(x::AbstractVector)
     return all(diff(x) .>= -1.0e-10)
 end
 
+function euler_error_pdr_style(a, Π, c, a_next, cfg::PEReferenceConfig)
+    c_right = similar(c)
+    for i in 1:size(c, 2)
+        c_plus = similar(c)
+        for j in 1:size(c, 2)
+            c_pol = LinearInterpolation(a, vec(c[:, j]), extrapolation_bc = Line())
+            c_plus[:, j] = c_pol.(a_next[:, i])
+        end
+        c_right[:, i] = inverse_marginal_utility(
+            cfg.beta * (1 + cfg.r) * (utility_marginal(c_plus, cfg.gamma) * Π[i, :]),
+            cfg.gamma,
+        )
+    end
+    err = c_right ./ c .- 1
+    err[a_next .<= cfg.amin] .= 0.0
+    return Dict(
+        "euler_error_style" => "pdr_linear_interpolation",
+        "max_abs_euler_error" => maximum(abs.(err)),
+        "mean_abs_euler_error" => mean(abs.(err)),
+        "max_euler_error" => maximum(err),
+        "min_euler_error" => minimum(err),
+        "constrained_state_count" => count(a_next .<= cfg.amin),
+        "interior_state_count" => count(a_next .> cfg.amin),
+    )
+end
+
 function build_payload(cfg::PEReferenceConfig, a, y, Π, c, a_next, D, converged, iterations, final_diff)
     aggs = aggregates(a, c, a_next, D)
+    euler_diag = euler_error_pdr_style(a, Π, c, a_next, cfg)
     payload = Dict(
         "problem_id" => "incomplete_markets_pe",
         "reference_source" => "JuliaEcon/scripts/incomplete_markets_pe_reference.jl",
@@ -276,6 +303,7 @@ function build_payload(cfg::PEReferenceConfig, a, y, Π, c, a_next, D, converged
             "distribution_mass" => sum(D),
             "policy_monotone_assets_next" => [monotone_non_decreasing(vec(a_next[:, i])) for i in 1:size(a_next, 2)],
             "policy_monotone_consumption" => [monotone_non_decreasing(vec(c[:, i])) for i in 1:size(c, 2)],
+            "euler_error" => euler_diag,
         ),
     )
     return payload

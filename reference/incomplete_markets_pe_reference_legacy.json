@@ -11107,7 +11107,16 @@
     ],
     "converged": true,
     "solver_family": "EGM_backward_iteration",
-    "final_policy_diff": 9.34883889355865e-10
+    "final_policy_diff": 9.34883889355865e-10,
+    "euler_error": {
+      "max_euler_error": 2.2576819280750726e-7,
+      "interior_state_count": 3480,
+      "euler_error_style": "pdr_linear_interpolation",
+      "max_abs_euler_error": 2.2576819280750726e-7,
+      "min_euler_error": 0.0,
+      "mean_abs_euler_error": 1.2553430685180444e-8,
+      "constrained_state_count": 20
+    }
   },
   "preset": "legacy",
   "transition": {
