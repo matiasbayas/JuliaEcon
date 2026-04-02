@@ -99,6 +99,7 @@ function default_config_for_preset(preset::String)
     elseif preset == "arde_prompt"
         return GrowthReferenceConfig(
             preset = "arde_prompt",
+            k_high_mult = 3.0,
             cheb_nodes = 21,
             maxit = 700,
             tol = 1.0e-9,
@@ -236,7 +237,7 @@ function generalized_steady_state(cfg::GrowthReferenceConfig, F)
     )
 end
 
-function generalized_backward_iterate(k, z, nq_next, cq_next, cfg::GrowthReferenceConfig, chi::Float64, Π, basis)
+function generalized_backward_iterate(k, z, nmin, nmax, nq_next, cq_next, cfg::GrowthReferenceConfig, chi::Float64, Π, basis)
     F, Fk, Fn = production_functions(cfg)
     nq = similar(nq_next)
     cq = similar(cq_next)
@@ -258,8 +259,8 @@ function generalized_backward_iterate(k, z, nq_next, cq_next, cfg::GrowthReferen
                 expected_rhs = Fk(z', k_next, n_next) .* utility_marginal(c_next, cfg)
                 return mu_c .- cfg.beta * (expected_rhs ⋅ pr_z)
             end
-            local_nmin = max(cfg.n_low_mult * eps(Float64), eps(Float64))
-            local_nmax = cfg.n_high_mult
+            local_nmin = max(nmin, eps(Float64))
+            local_nmax = nmax
             fa = h(local_nmin)
             fb = h(local_nmax)
             if isfinite(fa) && isfinite(fb) && signbit(fa) != signbit(fb)
@@ -312,7 +313,7 @@ function solve_generalized(cfg::GrowthReferenceConfig)
     total_root_fallbacks = 0
 
     for it in 1:cfg.maxit
-        nq_new, cq_new, root_fallbacks = generalized_backward_iterate(k_nodes, z, nq, cq, cfg, steady.chi, Π, basis)
+        nq_new, cq_new, root_fallbacks = generalized_backward_iterate(k_nodes, z, nmin, nmax, nq, cq, cfg, steady.chi, Π, basis)
         total_root_fallbacks += root_fallbacks
         if mod(it, 10) == 0 && norm(nq_new - nq) < cfg.tol
             return (steady = steady, z = z, pr = pr, Π = Π, k = k_nodes, basis = basis, nq = nq_new, cq = cq_new, iterations = it, root_fallbacks = total_root_fallbacks)
