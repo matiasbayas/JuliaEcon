@@ -68,6 +68,22 @@ function default_config_for_preset(preset::String)
             sigma_mode = "stationary",
             output_path = "reference/incomplete_markets_pe_reference_legacy.json",
         )
+    elseif preset == "pdr_table_calibration"
+        return PEReferenceConfig(
+            preset = "pdr_table_calibration",
+            beta = 0.988,
+            gamma = 1.0,
+            rho = 0.966,
+            sigma_y = 0.7,
+            sigma_mode = "stationary",
+            r = 0.02 / 4.0,
+            amin = 0.0,
+            amax = 250.0,
+            asset_nodes = 500,
+            shock_nodes = 8,
+            shock_method = "rouwenhorst",
+            output_path = "reference/incomplete_markets_pe_reference_pdr_table_calibration.json",
+        )
     elseif preset == "arde_prompt"
         return PEReferenceConfig(
             preset = "arde_prompt",
